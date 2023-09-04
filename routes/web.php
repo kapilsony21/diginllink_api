@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Api\AffOfferController;
+use App\Http\Controllers\Api\AffReportController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -14,5 +16,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    return 'ok';
 });
+
+Route::get('/offers/{aff_id}/{key}',[AffOfferController::class,'offer']);

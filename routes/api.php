@@ -2,7 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\Api\AffOfferController;
+use App\Http\Controllers\Api\AffReportController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -19,6 +20,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 
-Route::get('/',function() {
-    return "Ok API";
-});
+Route::get('/',[AffOfferController::class,'index']);
+Route::get('/offers/{aff_id}/{key}',[AffOfferController::class,'offer']);
