@@ -20,3 +20,5 @@ Route::get('/', function () {
 });
 
 Route::get('/offers/{aff_id}/{key}',[AffOfferController::class,'offer']);
+Route::get('/transaction/{aff_id}/{key}',[AffOfferController::class,'transaction']);
+

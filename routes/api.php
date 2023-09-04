@@ -22,3 +22,4 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::get('/',[AffOfferController::class,'index']);
 Route::get('/offers/{aff_id}/{key}',[AffOfferController::class,'offer']);
+Route::get('/transaction/{aff_id}/{key}',[AffOfferController::class,'transaction']);

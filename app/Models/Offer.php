@@ -17,7 +17,7 @@ class Offer extends Model
         'offer_start_date' => 'datetime:Y-m-d H:i:s',
         'offer_end_date' => 'datetime:Y-m-d H:i:s'
     ];
-    protected $hidden = [ 'created_at','updated_at','priceIn','modelIn','rev_comm','offer_category','user_id','pending_affiliate','rejected_affiliate','advertiser_id','external_id','api_id','offer_url','deleted_at','payoutRules','offer_kpi','targeting_activation','country_block','state_allow','state_block','city_allow','city_block'];
+    protected $hidden = [ 'created_at','updated_at','priceIn','modelIn','rev_comm','offer_category','user_id','pending_affiliate','rejected_affiliate','advertiser_id','external_id','api_id','offer_url','deleted_at','payoutRules','offer_kpi','targeting_activation','country_block','state_allow','state_block','city_allow','city_block','offer_access'];
 
  
     public function getCountryAllowAttribute($value) {

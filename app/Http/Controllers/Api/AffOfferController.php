@@ -9,7 +9,8 @@ use App\Models\Offer;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Cache;
-
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class AffOfferController extends Controller
 {
@@ -19,16 +20,22 @@ class AffOfferController extends Controller
 
     public function offer(Request $request, $aff_id,$key) {
             if(!$aff_id) {
-                    $this->errorResponse("invalid affiliate id!");
+                    return $this->errorResponse("invalid affiliate id!");
                 }
             if(!$key) {
-                $this->errorResponse("invalid API Key!");
+                return  $this->errorResponse("invalid API Key!");
                 }
         
-        $aff = DB::table('affiliates')->where('id',$aff_id)->where('secret_token',$key)->first();
+        $aff = DB::table('affiliates')->where('id',$aff_id)->first();
+                if(!$aff) {
+                    return  $this->errorResponse("invalid affiliate id!");
+                }
+                if($aff->secret_token !== $key) {
+                    return  $this->errorResponse("invalid API Key!"); 
+                }
         $aff_global_access = DB::table('offer_access')->where('offerid',0)->where('affiliateid',$aff_id)->first();
-                Cache::forget('OfferApiCache');
-        $offer = Cache::remember('OfferApiCache', 1800, function () use($aff_id) {
+
+        $offer = Cache::remember('OfferApiCache'.$aff_id.$key.$request->page, 1800, function () use($aff_id) {
             return  Offer::whereNot('rejected_affiliate','LIKE','%'.$aff_id.'%')->join('categories','offers.offer_category','categories.category_id')
             ->whereNot('offer_access',4)->orderBy('offers.created_at','desc')->paginate(500);
         });
@@ -50,18 +57,66 @@ class AffOfferController extends Controller
                         }
                     }
                 }
-                   
-               
-                
             });
-                return $offer;
+                return response()->json([
+                    'request_ip'=>$request->ip(),
+                    'aff_id' => $aff_id,
+                    'api_key' =>$key,
+                    'max_limit'=>500,
+                    'offers'=>$offer
+                ],200);
             
+    }
+
+    public function transaction(Request $request, $aff_id,$key) {
+       
+        
+                if(!$aff_id) {
+                    return $this->errorResponse("invalid affiliate id!");
+                }
+                if(!$key) {
+                    return  $this->errorResponse("invalid API Key!");
+                    }
+
+            $aff = DB::table('affiliates')->where('id',$aff_id)->first();
+           
+            if(!$aff) {
+                    return  $this->errorResponse("invalid affiliate id!");
+                }
+                if($aff->secret_token !== $key) {
+                    return  $this->errorResponse("invalid API Key!"); 
+                }
+               
+                    if($request->start_date == null || $request->start_date == "empty") {
+                        return  $this->errorResponse("invalid empty start date!"); 
+                        }
+                    $validator = Validator::make($request->all(),[
+                        'start_date'=>'required|date_format:Y-m-d'
+                    ]);
+                if($validator->fails()) {
+                    return $validator->errors();
+                }
+
+                $start_date = Carbon::parse($request->start_date)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::now()->endOfDay()->format('Y-m-d');
+
+                $report = DB::table('general_reports')->join('offers','general_reports.offerid','=','offers.offerid')
+                ->where('affiliateid',$aff_id)
+                ->selectRaw(DB::raw("affiliateid,offers.offerid as offerid, offers.offer_name as offer_name, offers.offer_currency as currency, conversionid as DglnkTransactionID, offers.modelOut as payout_model, JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.sale')) as sale,JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.status')) as status,JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.priceOut')) as priceOut, JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub1')) as sub1,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub2')) as sub2,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub3')) as sub3,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub4')) as sub4,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub5')) as sub5,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub6')) as sub6,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub7')) as sub7,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub8')) as sub8,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub9')) as sub9,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub10')) as sub10,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.deviceid')) as deviceid,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.androidid')) as androidid,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.googleaid')) as googleaid"))
+                ->where('conv_count',1)
+                ->where(function($query) use($start_date,$end_date) {
+                      $query->whereBetween('general_reports.created_at',[$start_date,$end_date]);
+                      $query->orWhereBetween('general_reports.conversion_time',[$start_date,$end_date]);
+                })->paginate(1000);
+
+                return $report;
+
     }
 
     public function errorResponse($message) {
             return response()->json([
                 'status' => 'error',
                 'response'=> $message
-            ],400);
+            ],401);
     }
  }
