@@ -35,12 +35,32 @@ class AffOfferController extends Controller
                 }
         $aff_global_access = DB::table('offer_access')->where('offerid',0)->where('affiliateid',$aff_id)->first();
 
-        $offer = Cache::remember('OfferApiCache'.$aff_id.$key.$request->page, 1800, function () use($aff_id) {
-            return  Offer::whereNot('rejected_affiliate','LIKE','%'.$aff_id.'%')->join('categories','offers.offer_category','categories.category_id')
-            ->whereNot('offer_access',4)->orderBy('offers.created_at','desc')->paginate(500);
+            $OfferAPICachekey = 'OfferApiCache'.$aff_id.$key.$request->ip().$request->page.json_encode($aff_global_access).$request->keyword.$request->offer_access.$request->country.$request->offer_status;
+        $offer = Cache::remember($OfferAPICachekey, 1800, function () use($aff_id,$request,$aff_global_access) {
+            return  Offer::join('categories','offers.offer_category','categories.category_id')->whereNot('offer_access',4)
+            ->where(function($query) use($request,$aff_id) {
+                    $query->whereNull('rejected_affiliate')->orWhere('rejected_affiliate','NOT LIKE','%'.$aff_id."%");
+                    if($request->offer_access !== null) {
+                            $query->where('offer_access',$request->offer_access);
+                    } 
+                    if($request->keyword !== null) {
+                        $q->where('offerid',$request->keyword)->orWhere('offer_name',$request->keyword);
+                    }
+                    if($request->country !== null) {
+                        $q->whereIn('country_allow',[$request->country]);
+                    }
+                    if($request->offer_access !== null) {
+                        if($request->offer_access == 3) {
+                            $q->where('assigned_affiliate','like',$aff_id);
+                        }
+                    }
+                    if($request->offer_status !== null) {
+                        $q->where('offer_status',$request->offer_status);
+                    }
+            })->orderBy('offerid','desc')->paginate(2500);
         });
 
-        $offer->each(function($offer) use($aff_id,$aff_global_access) {
+        $offer->map(function($offer) use($aff_id,$aff_global_access) {
                         $offer->can_run = false;
                         $offer->tracking_url = null;
                         $offer->assigned_affiliate = "not assigned";
@@ -62,7 +82,7 @@ class AffOfferController extends Controller
                     'request_ip'=>$request->ip(),
                     'aff_id' => $aff_id,
                     'api_key' =>$key,
-                    'max_limit'=>500,
+                    'max_limit'=>2500,
                     'offers'=>$offer
                 ],200);
             
@@ -102,7 +122,7 @@ class AffOfferController extends Controller
 
                 $report = DB::table('general_reports')->join('offers','general_reports.offerid','=','offers.offerid')
                 ->where('affiliateid',$aff_id)
-                ->selectRaw(DB::raw("affiliateid,offers.offerid as offerid, offers.offer_name as offer_name, offers.offer_currency as currency, conversionid as DglnkTransactionID, offers.modelOut as payout_model, JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.sale')) as sale,JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.status')) as status,JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.priceOut')) as priceOut, JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub1')) as sub1,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub2')) as sub2,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub3')) as sub3,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub4')) as sub4,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub5')) as sub5,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub6')) as sub6,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub7')) as sub7,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub8')) as sub8,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub9')) as sub9,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub10')) as sub10,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.deviceid')) as deviceid,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.androidid')) as androidid,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.googleaid')) as googleaid"))
+                ->selectRaw(DB::raw("affiliateid,offers.offerid as offerid, offers.offer_name as offer_name, offers.offer_currency as currency, conversionid as DglnkTransactionID, conversion_time, offers.modelOut as payout_model, JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.sale')) as sale,JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.status')) as status,JSON_UNQUOTE(JSON_EXTRACT(conversion_data,'$.priceOut')) as priceOut, JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub1')) as sub1,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub2')) as sub2,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub3')) as sub3,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub4')) as sub4,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub5')) as sub5,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub6')) as sub6,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub7')) as sub7,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub8')) as sub8,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub9')) as sub9,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.sub10')) as sub10,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.deviceid')) as deviceid,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.androidid')) as androidid,JSON_UNQUOTE(JSON_EXTRACT(click_data,'$.googleaid')) as googleaid"))
                 ->where('conv_count',1)
                 ->where(function($query) use($start_date,$end_date) {
                       $query->whereBetween('general_reports.created_at',[$start_date,$end_date]);
